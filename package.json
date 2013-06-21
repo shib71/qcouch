@@ -1,0 +1,22 @@
+{
+  "name": "qcouch",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "tap ./test"
+  },
+  "dependencies": {
+    "Q": "*",
+    "felix-couchdb": "*"
+  },
+  "devDependencies": {
+    "tap": "*"
+  },
+  "repository": "",
+  "author": "Blair McKenzie",
+  "license": "BSD"
+}
