@@ -1,7 +1,7 @@
 {
   "name": "qcouch",
-  "version": "0.0.0",
-  "description": "",
+  "version": "0.0.1",
+  "description": "A wrapper for felix-couchdb which uses promises instead of callbacks, and adds a number of helper behaviours.",
   "main": "index.js",
   "directories": {
     "test": "test"
@@ -16,7 +16,7 @@
   "devDependencies": {
     "tap": "*"
   },
-  "repository": "",
+  "repository": "https://github.com/shib71/qcouch",
   "author": "Blair McKenzie",
   "license": "BSD"
 }
