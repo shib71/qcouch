@@ -11,7 +11,7 @@ var newdb = new qcouch({
       views: {
         all: {
           map: function(doc) {
-            emit(null, null);
+            emit(doc._id, null);
           }
         }
       }
@@ -20,22 +20,13 @@ var newdb = new qcouch({
 });
 
 Q.all([ newdb.clientinitialized, newdb.dbinitialized, newdb.designsinitialized ]).then(function(){
-  var newdb2 = new qcouch({
-    databasename:dbname,
-    designs:{
-      test: {
-        views: {
-          changed: {
-            map: function(doc) {
-              emit(null, null);
-            }
-          }
-        }
-      }
-    }
+  return newdb.saveDoc({ abc:123, def:"hello world" }).then(function(){
+    newdb.runView("test","all",{ resolveto:"keys" }).then(function(data){
+      console.log("keys",arguments);
+    }).done();
+    
+    newdb.runView("test","all",{ resolveto:"objects" }).then(function(data){
+      console.log("objects",arguments);
+    }).done();
   });
-
-  Q.all([ newdb.clientinitialized, newdb.dbinitialized, newdb.designsinitialized ]).then(function(){
-    console.log("all is well");
-  }).done();
 }).done();

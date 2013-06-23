@@ -9,7 +9,10 @@ module.exports = qcouch = function(config){
   this.designs = config.designs || {};
   this.host = config.host || "localhost";
   this.port = config.port || 5984;
-
+  
+  this.fromDB = config.fromDB;
+  this.toDB = config.toDB;
+  
   if (typeof(this.databasename)!=="string" || !this.databasename.length)
     throw "Config must include a databasename property";
 
@@ -73,21 +76,49 @@ qcouch.prototype.couchMethod = function(id,args){
   else {
     args.unshift(this.designsinitialized);
   }
-
+  
   return Q.all(args).then(function(args){
     var deferred = Q.defer(), allow = args.shift();
-
+    
     if (["changesStream"].indexOf(id)===-1){
-      args.push(function(){
-        var args = Array.prototype.slice.call(arguments), err = args.shift();
-
-        if (err)
-          deferred.reject(err);
-        else if (args.length == 1)
+      // if this database has a `toDB` function, use it to prepare saved docs
+      if (self.toDB){
+        switch (id){
+          case "saveDoc":
+            if (typeof(args[0])==="object")
+              args[0] = self.toDB(args[0]);
+            else if (typeof(args[1])==="object")
+              args[1] = self.toDB(args[1]);
+            break;
+          case "bulkDocs":
+            if (args[0] && args[0].docs && util.isArray(args[0].docs)){
+              for (var i=0, ii=args[0].docs.length; i<ii; i++)
+                args[0].docs[i] = self.toDB(args[0].docs[i]);
+            }
+            break;
+        }
+      }
+      
+      if (id==="getDoc" && self.fromDB){
+        args.push(function(){
+          var args = Array.prototype.slice.call(arguments), err = args.shift();
+  
+          if (err)
+            deferred.reject(err);
+          
+          deferred.resolve(self.fromDB(args[0]));
+        });
+      }
+      else{
+        args.push(function(){
+          var args = Array.prototype.slice.call(arguments), err = args.shift();
+  
+          if (err)
+            deferred.reject(err);
+          
           deferred.resolve(args[0]);
-        else
-          deferred.resolve(args);
-      });
+        });
+      }
 
       self.db[id].apply(self.db,args);
     }
@@ -158,7 +189,13 @@ qcouch.prototype.updateDesign = function(designname){
 
 qcouch.prototype.runView = function(design,view,query){
   var self = this, promise = "", resolution = "";
-
+  
+  if (design==="allDocs"){
+    query = view;
+    view = design;
+    design = undefined;
+  }
+  
   query = query || {};
 
   if (query.resolveto && !["auto","objects","keys"].indexOf(query.resolve)===-1)
@@ -178,14 +215,19 @@ qcouch.prototype.runView = function(design,view,query){
     query.limit += 1;
 
   // run view, convert couch error to JavaScript error
-  promise = self.view(design,view,query).then(function(result){
+  if (design===undefined && view==="allDocs"){
+    promise = self.allDocs(query)
+  }
+  else{
+    promise = self.view(design,view,query)
+  }
+  
+  // check for errors in result
+  promise = promise.then(function(result){
     if (result.error)
       throw new Error(result.reason);
     else
       return result;
-  },function(err){
-    console.log(query);console.log(err);
-    throw new Error(err.error);
   });
 
   // to resolve, extract map data.rows[n].doc
@@ -193,26 +235,24 @@ qcouch.prototype.runView = function(design,view,query){
     case "objects":
       promise = promise.then(function(data){
         var newresult = data.rows.map(function(o){
-          return o.doc;
+          return self.fromDB ? self.fromDB(o.doc) : o.doc;
         }), next = {};
-
+        
         if (newresult.length && query.limit && data.rows.length == query.limit){
           next.startkey = data.rows[data.rows.length-1].key;
           next.startkey_docid = data.rows[data.rows.length-1].id;
-
+          
           newresult = newresult.slice(0,query.limit-1);
-
+          
           Object.defineProperty(newresult,"next_startkey",{ value:next.startkey, enumerable:false });
           Object.defineProperty(newresult,"next_startkey_docid",{ value:next.startkey_docid, enumerable:false });
         }
-
-        Object.defineProperty(newresult,"doctype",{ value:name, enumerable:false });
-
+        
         if (newresult.length){
           Object.defineProperty(newresult,"startkey",{ value:data.rows[0].key, enumerable:false });
           Object.defineProperty(newresult,"startkey_docid",{ value:data.rows[0].id, enumerable:false });
         }
-
+        
         return newresult;
       });
       break;
@@ -220,25 +260,23 @@ qcouch.prototype.runView = function(design,view,query){
       promise = promise.then(function(data){
         var newresult = data.rows.map(function(o){
           return o.key;
-        });
+        }), next = {};
 
         if (newresult.length && query.limit && data.rows.length == query.limit){
           next.startkey = data.rows[data.rows.length-1].key;
           next.startkey_docid = data.rows[data.rows.length-1].id;
-
+          
           newresult = newresult.slice(0,query.limit-1);
-
+          
           Object.defineProperty(newresult,"next_startkey",{ value:next.startkey, enumerable:false });
           Object.defineProperty(newresult,"next_startkey_docid",{ value:next.startkey_docid, enumerable:false });
         }
-
-        Object.defineProperty(newresult,"doctype",{ value:name, enumerable:false });
-
+        
         if (newresult.length){
           Object.defineProperty(newresult,"startkey",{ value:data.rows[0].key, enumerable:false });
           Object.defineProperty(newresult,"startkey_docid",{ value:data.rows[0].id, enumerable:false });
         }
-
+        
         return newresult;
       });
       break;
