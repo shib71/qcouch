@@ -16,7 +16,15 @@
   "devDependencies": {
     "tap": "*"
   },
-  "repository": "https://github.com/shib71/qcouch",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/shib71/qcouch"
+  },
   "author": "Blair McKenzie",
-  "license": "BSD"
+  "license": "BSD",
+  "readmeFilename": "README.md",
+  "gitHead": "339a64dcb74d595925b56b7dc3bebd5556495403",
+  "bugs": {
+    "url": "https://github.com/shib71/qcouch/issues"
+  }
 }
