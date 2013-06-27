@@ -1,6 +1,6 @@
 {
   "name": "qcouch",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A wrapper for felix-couchdb which uses promises instead of callbacks, and adds a number of helper behaviours.",
   "main": "index.js",
   "directories": {
