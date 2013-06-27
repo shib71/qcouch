@@ -10,7 +10,7 @@
     "test": "tap ./test"
   },
   "dependencies": {
-    "Q": "*",
+    "q": "*",
     "felix-couchdb": "*"
   },
   "devDependencies": {
