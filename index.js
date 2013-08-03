@@ -21,7 +21,16 @@ module.exports = qcouch = function(config){
   this.clientinitialized = clientinit.promise;
   this.dbinitialized = dbinit.promise;
   this.designsinitialized = designinit.promise;
-
+  
+  for (var designname in this.designs){
+    if (this.designs[designname].views){
+      this[designname] = {};
+      for (var k in this.designs[designname].views){
+        this[designname][k] = eval("(function(query){return this.runView('"+designname+"','"+k+"',query); })",{});
+      }
+    }
+  };
+  
   Q.npost(this.client,"allDbs").then(function(arr){
     clientinit.resolve(true);
     return self.exists();
@@ -70,10 +79,11 @@ qcouch.prototype.couchMethod = function(id,args){
     args.unshift(this.clientinitialized);
   }
   else if (["view"].indexOf(id)===-1){
-    // all functions except the ones listed only need the db to exist
+    // these functions don't need the views to be up to date
     args.unshift(this.dbinitialized);
   }
   else {
+    // these functions need views
     args.unshift(this.designsinitialized);
   }
   
@@ -91,35 +101,29 @@ qcouch.prototype.couchMethod = function(id,args){
               args[1] = self.toDB(args[1]);
             break;
           case "bulkDocs":
-            if (args[0] && args[0].docs && util.isArray(args[0].docs)){
-              for (var i=0, ii=args[0].docs.length; i<ii; i++)
-                args[0].docs[i] = self.toDB(args[0].docs[i]);
-            }
+            if (args[0] && args[0].docs && util.isArray(args[0].docs))
+              args[0].docs = args[0].docs.map(self.toDB);
             break;
         }
       }
       
       if (id==="getDoc" && self.fromDB){
-        args.push(function(){
-          var args = Array.prototype.slice.call(arguments), err = args.shift();
-  
+        args.push(function(err,result){
           if (err)
-            deferred.reject(err);
+            throw new Error(err.reason);
           
-          deferred.resolve(self.fromDB(args[0]));
+          deferred.resolve(result);
         });
       }
       else{
-        args.push(function(){
-          var args = Array.prototype.slice.call(arguments), err = args.shift();
-  
+        args.push(function(err,result){
           if (err)
-            deferred.reject(err);
+            throw new Error(err.reason);
           
-          deferred.resolve(args[0]);
+          deferred.resolve(result);
         });
       }
-
+      
       self.db[id].apply(self.db,args);
     }
     else{
@@ -141,17 +145,12 @@ qcouch.prototype.updateDesigns = function(){
 
 qcouch.prototype.updateDesign = function(designname){
   var self = this;
-
-  this[designname] = {};
-  for (var k in this.designs[designname]){
-    this[designname][k] = eval("(function(query){return this.runView('"+designname+"','"+k+"',query); })",{});
-  }
-
+  
   return this.dbinitialized.then(function(){
     var deferred = Q.defer();
-
+    
     util.puts("Checking design document ["+designname+"]");
-
+    
     self.db.getDoc("_design/"+designname,function(err,olddoc){
       if (err && err.error && err.error==="not_found"){
         util.puts("Design document ["+designname+"] doesn't exist - creating");

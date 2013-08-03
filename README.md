@@ -31,7 +31,7 @@ of keys instead of the standard couchdb result.
 
 ### Just the Docs
 
-You can also add `resolveto:"keys"` to the query to get a simple array of objects.
+You can also add `resolveto:"objects"` to the query to get a simple array of objects.
 
 ### Pagination
 
