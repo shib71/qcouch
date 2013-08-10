@@ -110,17 +110,17 @@ qcouch.prototype.couchMethod = function(id,args){
       if (id==="getDoc" && self.fromDB){
         args.push(function(err,result){
           if (err)
-            throw new Error(err.reason);
-          
-          deferred.resolve(result);
+            deferred.reject(new Error(err.reason));
+          else
+            deferred.resolve(result);
         });
       }
       else{
         args.push(function(err,result){
           if (err)
-            throw new Error(err.reason);
-          
-          deferred.resolve(result);
+            deferred.reject(new Error(err.reason));
+          else
+            deferred.resolve(result);
         });
       }
       
