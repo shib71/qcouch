@@ -3,25 +3,171 @@ var couchdb = require("felix-couchdb");
 var util = require("util");
 
 module.exports = qcouch = function(config){
-  var self = this, clientinit = Q.defer(), dbinit = Q.defer(), designinit = Q.defer();
+  if (typeof(config.databasename)!=="string" || !config.databasename.length)
+    throw new Error((this.name ? "["+this.name+"] " : "") + "Config must include a databasename property");
+  
 
-  this.databasename = config.databasename;
-  this.designs = config.designs || {};
+  this.name = config.name;
+  this.debug = config.debug;
+
+  // set up client
   this.host = config.host || "localhost";
   this.port = config.port || 5984;
+  this.client = couchdb.createClient(this.port,this.host);
+
+  // set up db
+  this.databasename = config.databasename;
+
+  // set up designs
+  this.designs = config.designs || {};
   
   this.fromDB = config.fromDB;
   this.toDB = config.toDB;
-  
-  if (typeof(this.databasename)!=="string" || !this.databasename.length)
-    throw "Config must include a databasename property";
+}
 
-  this.client = couchdb.createClient(this.port,this.host);
-  this.db = this.client.db(this.databasename);
-  this.clientinitialized = clientinit.promise;
-  this.dbinitialized = dbinit.promise;
-  this.designsinitialized = designinit.promise;
-  
+Object.defineProperty(qcouch.prototype,"client",{
+  get : function(){
+    return this._client;
+  },
+  set : function(v){
+    this._client = v;
+
+    this.initClient();
+  }
+});
+
+qcouch.prototype.initClient = function(){
+  var clientinit = Q.defer(), self = this;
+
+  this.clientinit = clientinit.promise;
+
+  Q.npost(this.client,"allDbs").then(function(arr){
+    if (self.debug)
+      util.puts((self.name ? "["+self.name+"] " : "") + "Client is available");
+
+    clientinit.resolve(true);
+  },function(err){
+    if (self.debug)
+      util.puts((self.name ? "["+self.name+"] " : "") + "Client is not available - " + err.toString());
+
+    clientinit.reject(err);
+  }).done();
+}
+
+Object.defineProperty(qcouch.prototype,"clientinit",{
+  get : function(){
+    return this._clientinit;
+  },
+  set : function(v){
+    this._clientinit = v;
+    
+    this.initDB();
+  }
+});
+
+Object.defineProperty(qcouch.prototype,"databasename",{
+  get : function(){
+    return this._databasename;
+  },
+  set : function(v){
+    this._databasename = v;
+
+    this.initDB();
+  }
+})
+
+qcouch.prototype.initDB = function(){
+  if (this.client===undefined || this.clientinit===undefined || this.databasename===undefined)
+    return;
+
+
+  var dbinit = Q.defer(), self = this;
+
+  this.dbinit = dbinit.promise;
+  this.db = null;
+
+  this.clientinit.then(function(){
+    self.db = self.client.db(self.databasename);
+
+    return self.exists();
+  },function(err){
+    // if client was rejected, reject db
+    dbinit.reject(err);
+  }).then(function(exists){
+    if (!exists){
+      if (self.debug)
+        util.puts((self.name ? "["+self.name+"] " : "") + "DB ["+self.databasename+"] does not exist - creating now");
+
+      return self.create();
+    }
+    else{
+      if (self.debug)
+        util.puts((self.name ? "["+self.name+"] " : "") + "DB ["+self.databasename+"] exists");
+
+      return true;
+    }
+  }).then(function(){
+    if (self.debug)
+      util.puts((self.name ? "["+self.name+"] " : "") + "DB ["+self.databasename+"] is available");
+
+    dbinit.resolve(true);
+  },function(err){
+    if (self.debug)
+      util.puts((self.name ? "["+self.name+"] " : "") + "DB ["+self.databasename+"] is not available - " + err.toString());
+
+    dbinit.reject(err);
+  }).done();
+}
+
+Object.defineProperty(qcouch.prototype,"dbinit",{
+  get : function(){
+    return this._dbinit;
+  },
+  set : function(v){
+    this._dbinit = v;
+
+    this.initDesign();
+  }
+});
+
+Object.defineProperty(qcouch.prototype,"designs",{
+  get : function(){
+    return this._designs;
+  },
+  set : function(v){
+    this._designs = v;
+
+    this.initDesign();
+  }
+});
+
+qcouch.prototype.initDesign = function(){
+  if (this.dbinit===undefined || this.designs===undefined)
+    return;
+
+
+  var designinit = Q.defer(), self = this;
+
+  this.designinit = designinit.promise;
+
+  this.dbinit.then(function(){
+    if (self.designs==={} || self.designs===undefined)
+      return true;
+    else
+      return self.updateDesigns();
+  }).then(function(){
+    if (self.debug)
+      util.puts((self.name ? "["+self.name+"] " : "") + "Designs are up to date");
+
+    designinit.resolve(true);
+  },function(err){
+    if (self.debug)
+      util.puts((self.name ? "["+self.name+"] " : "") + "Designs could not be updated - " + err.toString());
+
+    designinit.reject(err);
+  }).done();
+
+  // auto calculated functions
   for (var designname in this.designs){
     if (this.designs[designname].views){
       this[designname] = {};
@@ -30,42 +176,18 @@ module.exports = qcouch = function(config){
       }
     }
   };
-  
-  Q.npost(this.client,"allDbs").then(function(arr){
-    clientinit.resolve(true);
-    return self.exists();
-  },function(err){
-    clientinit.reject(err);
-    dbinit.reject(err);
-    designinit.reject(err);
-
-    //throw err;
-  }).then(function(exists){
-    if (!exists){
-      util.puts("DB ["+self.databasename+"] does not exist - creating now");
-      return self.create();
-    }
-    else{
-      util.puts("DB ["+self.databasename+"] exists");
-      return true;
-    }
-  }).then(function(){
-    dbinit.resolve(true);
-
-    return self.updateDesigns();
-  },function(err){
-    dbinit.reject(err);
-    designinit.reject(err);
-
-    //throw err;
-  }).done(function(){
-    designinit.resolve(true);
-  },function(err){
-    designinit.reject(err);
-
-    //throw err;
-  });
 }
+
+Object.defineProperty(qcouch.prototype,"designinit",{
+  get : function(){
+    return this._designinit;
+  },
+  set : function(v){
+    var self = this;
+
+    this._designinit = v;
+  }
+});
 
 for (var k in couchdb.Db.prototype){
   qcouch.prototype[k] = eval("(function(){ return this.couchMethod('"+k+"',Array.prototype.slice.call(arguments)); })",{});
@@ -76,15 +198,15 @@ qcouch.prototype.couchMethod = function(id,args){
 
   if (["exists","create","info"].indexOf(id)>-1){
     // these functions don't need the database to exist
-    args.unshift(this.clientinitialized);
+    args.unshift(this.clientinit);
   }
   else if (["view"].indexOf(id)===-1){
     // these functions don't need the views to be up to date
-    args.unshift(this.dbinitialized);
+    args.unshift(this.dbinit);
   }
   else {
     // these functions need views
-    args.unshift(this.designsinitialized);
+    args.unshift(this.designinit);
   }
   
   return Q.all(args).then(function(args){
@@ -107,22 +229,14 @@ qcouch.prototype.couchMethod = function(id,args){
         }
       }
       
-      if (id==="getDoc" && self.fromDB){
-        args.push(function(err,result){
-          if (err)
-            deferred.reject(new Error(err.reason));
-          else
-            deferred.resolve(result);
-        });
-      }
-      else{
-        args.push(function(err,result){
-          if (err)
-            deferred.reject(new Error(err.reason));
-          else
-            deferred.resolve(result);
-        });
-      }
+      args.push(function(err,result){
+        if (err)
+          deferred.reject(new Error(err.reason));
+        else if (id==="getDoc" && self.fromDB)
+          deferred.resolve(self.fromDB(result));
+        else
+          deferred.resolve(result);
+      });
       
       self.db[id].apply(self.db,args);
     }
@@ -134,8 +248,11 @@ qcouch.prototype.couchMethod = function(id,args){
   });
 };
 
-qcouch.prototype.updateDesigns = function(){
+qcouch.prototype.updateDesigns = function(designs){
   var updates = [];
+
+  for (var k in designs)
+    this.designs[k] = designs[k];
 
   for (var k in this.designs)
     updates.push(this.updateDesign(k));
@@ -146,16 +263,16 @@ qcouch.prototype.updateDesigns = function(){
 qcouch.prototype.updateDesign = function(designname){
   var self = this;
   
-  return this.dbinitialized.then(function(){
-    var deferred = Q.defer();
+  return this.dbinit.then(function(){
+    var deferred = Q.defer(), designid = self.designs[designname]._id || "_design/"+designname;
     
-    util.puts("Checking design document ["+designname+"]");
+    util.puts((self.name ? "["+self.name+"] " : "") + "Checking design document ["+designname+"]");
     
-    self.db.getDoc("_design/"+designname,function(err,olddoc){
+    self.db.getDoc(designid,function(err,olddoc){
       if (err && err.error && err.error==="not_found"){
-        util.puts("Design document ["+designname+"] doesn't exist - creating");
-        deferred.resolve(self.saveDoc("_design/"+designname,self.designs[designname]).then(function(){
-          util.puts("Design document ["+designname+"] created");
+        util.puts((self.name ? "["+self.name+"] " : "") + "Design document ["+designname+"] doesn't exist - creating");
+        deferred.resolve(self.saveDoc(designid,self.designs[designname]).then(function(){
+          util.puts((self.name ? "["+self.name+"] " : "") + "Design document ["+designname+"] created");
         }));
         return;
       }
@@ -171,13 +288,13 @@ qcouch.prototype.updateDesign = function(designname){
       if (isdiff){
         self.designs[designname]._id = olddoc._id;
         self.designs[designname]._rev = olddoc._rev;
-        util.puts("Design document ["+designname+"] needs to be updated");
+        util.puts((self.name ? "["+self.name+"] " : "") + "Design document ["+designname+"] needs to be updated");
         deferred.resolve(self.saveDoc(self.designs[designname]).then(function(){
-          util.puts("Design document ["+designname+"] updated");
+          util.puts((self.name ? "["+self.name+"] " : "") + "Design document ["+designname+"] updated");
         }));
       }
       else{
-        util.puts("Design document ["+designname+"] is already up to date");
+        util.puts((self.name ? "["+self.name+"] " : "") + "Design document ["+designname+"] is already up to date");
         deferred.resolve(true);
       }
     });
@@ -198,7 +315,7 @@ qcouch.prototype.runView = function(design,view,query){
   query = query || {};
 
   if (query.resolveto && !["auto","objects","keys"].indexOf(query.resolve)===-1)
-    throw "View resolveto property must be one of [auto|objects|keys]";
+    throw new Error((this.name ? "["+this.name+"] " : "") + "View resolveto property must be one of [auto|objects|keys]");
   else {
     resolution = query.resolveto || "auto";
     delete query.resolveto;

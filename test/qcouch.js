@@ -11,12 +11,12 @@ test("invalid couch server",function(t){
     databasename:"abc",
     port: 9876
   });
-
-  newdb.clientinitialized.then(function(){
+  
+  newdb.clientinit.then(function(){
     t.fail("client should not be initialized");
   },function(err){
     t.ok("client could not be initialized");
-  });
+  }).done();
 });
 
 test("initialize new database",function(t){
@@ -28,7 +28,7 @@ test("initialize new database",function(t){
     databasename:dbname
   });
 
-  Q.all([ newdb.clientinitialized, newdb.dbinitialized, newdb.designsinitialized ]).then(function(){
+  Q.all([ newdb.clientinit, newdb.dbinit, newdb.designinit ]).then(function(){
     var db = client.db(dbname);
 
     db.exists(function(err,exists){
@@ -62,7 +62,7 @@ test("initialize new database with a design",function(t){
     }
   });
 
-  Q.all([ newdb.clientinitialized, newdb.dbinitialized, newdb.designsinitialized ]).then(function(){
+  Q.all([ newdb.clientinit, newdb.dbinit, newdb.designinit ]).then(function(){
     var db = client.db(dbname);
 
     db.exists(function(err,exists){
@@ -103,7 +103,7 @@ test("initialize existing database with a changed design",function(t){
     }
   });
 
-  Q.all([ newdb.clientinitialized, newdb.dbinitialized, newdb.designsinitialized ]).then(function(){
+  Q.all([ newdb.clientinit, newdb.dbinit, newdb.designinit ]).then(function(){
 
     var newdb2 = new qcouch({
       databasename:dbname,
@@ -120,7 +120,7 @@ test("initialize existing database with a changed design",function(t){
       }
     });
 
-    Q.all([ newdb2.clientinitialized, newdb2.dbinitialized, newdb2.designsinitialized ]).then(function(){
+    Q.all([ newdb2.clientinit, newdb2.dbinit, newdb2.designinit ]).then(function(){
       var db = client.db(dbname);
 
       db.exists(function(err,exists){
@@ -177,7 +177,7 @@ test("initialize existing database with a new design",function(t){
     }
   });
 
-  Q.all([ newdb.clientinitialized, newdb.dbinitialized, newdb.designsinitialized ]).then(function(){
+  Q.all([ newdb.clientinit, newdb.dbinit, newdb.designinit ]).then(function(){
 
     var newdb2 = new qcouch({
       databasename:dbname,
@@ -203,7 +203,7 @@ test("initialize existing database with a new design",function(t){
       }
     });
 
-    Q.all([ newdb2.clientinitialized, newdb2.dbinitialized, newdb2.designsinitialized ]).then(function(){
+    Q.all([ newdb2.clientinit, newdb2.dbinit, newdb2.designinit ]).then(function(){
       var db = client.db(dbname);
 
       db.exists(function(err,exists){
@@ -377,7 +377,7 @@ test("getDoc",function(t){
     databasename:dbname
   });
 
-  Q.all([ newdb.clientinitialized, newdb.dbinitialized, newdb.designsinitialized ]).then(function(){
+  Q.all([ newdb.clientinit, newdb.dbinit, newdb.designinit ]).then(function(){
     db.saveDoc({ abc:123, def:"hello world" },function(err,doc){
       if (err)
         throw err.error;
@@ -412,7 +412,7 @@ test("getDoc with fromDB",function(t){
     }
   });
 
-  Q.all([ newdb.clientinitialized, newdb.dbinitialized, newdb.designsinitialized ]).then(function(){
+  Q.all([ newdb.clientinit, newdb.dbinit, newdb.designinit ]).then(function(){
     db.saveDoc({ abc:123, def:"hello world" },function(err,doc){
       if (err)
         throw err.error;
@@ -453,7 +453,7 @@ test("basic view",function(t){
     }
   });
 
-  Q.all([ newdb.clientinitialized, newdb.dbinitialized, newdb.designsinitialized ]).then(function(){
+  Q.all([ newdb.clientinit, newdb.dbinit, newdb.designinit ]).then(function(){
     var db = client.db(dbname);
 
     db.saveDoc({ abc:123, def:"hello world" },function(err,doc){
@@ -496,7 +496,7 @@ test("view - resolve to objects",function(t){
     }
   });
 
-  Q.all([ newdb.clientinitialized, newdb.dbinitialized, newdb.designsinitialized ]).then(function(){
+  Q.all([ newdb.clientinit, newdb.dbinit, newdb.designinit ]).then(function(){
     var db = client.db(dbname);
 
     db.saveDoc({ abc:123, def:"hello world" },function(err,doc){
@@ -544,7 +544,7 @@ test("view - resolve to objects with fromDB",function(t){
     }
   });
 
-  Q.all([ newdb.clientinitialized, newdb.dbinitialized, newdb.designsinitialized ]).then(function(){
+  Q.all([ newdb.clientinit, newdb.dbinit, newdb.designinit ]).then(function(){
     var db = client.db(dbname);
 
     db.saveDoc({ abc:123, def:"hello world" },function(err,doc){
@@ -582,7 +582,7 @@ test("view - allDocs with fromDB",function(t){
     }
   });
 
-  Q.all([ newdb.clientinitialized, newdb.dbinitialized, newdb.designsinitialized ]).then(function(){
+  Q.all([ newdb.clientinit, newdb.dbinit, newdb.designinit ]).then(function(){
     var db = client.db(dbname);
 
     db.saveDoc({ abc:123, def:"hello world" },function(err,doc){
@@ -626,7 +626,7 @@ test("view - resolve to keys",function(t){
     }
   });
 
-  Q.all([ newdb.clientinitialized, newdb.dbinitialized, newdb.designsinitialized ]).then(function(){
+  Q.all([ newdb.clientinit, newdb.dbinit, newdb.designinit ]).then(function(){
     var db = client.db(dbname);
 
     db.saveDoc({ abc:123, def:"hello world" },function(err,doc){
